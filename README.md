@@ -3,6 +3,8 @@
 ObjectiveGit provides Cocoa bindings to the
 [libgit2](https://github.com/libgit2/libgit2) library, packaged as an `.xcframework` for macOS 15 (Sequoia) or later, arm64 only. There is no iOS support.
 
+> This is a fork of [libgit2/objective-git](https://github.com/libgit2/objective-git), modernized to build on the current Xcode/libgit2 toolchain (macOS 15+, arm64-only, no iOS) and extended with worktree support (`GTWorktree`, `GTRepository+Worktree`).
+
 ## Features
 
 A brief summary of the available functionality:
@@ -12,6 +14,7 @@ A brief summary of the available functionality:
 * Internals: configuration, tree, blob, object database
 * Network: clone, fetch, push, pull
 * Transports: HTTP, HTTPS, SSH, local filesystem
+* Worktrees: create, look up, list, and open as a repository
 
 Not all libgit2 features are available, but if you run across something missing, please consider [contributing a pull request](#contributing)!
 
@@ -61,17 +64,23 @@ If you bump one of the vendored submodule versions (libgit2, libssh2, or OpenSSL
 script/clean_externals
 ```
 
+### Using the built framework
+
+Embed `build/ObjectiveGit.xcframework` in a downstream app by dragging it into the Xcode project navigator (or adding it under the target's "Frameworks, Libraries, and Embedded Content" build phase) and setting it to "Embed & Sign". Rebuilding is a source change, not a binary update, so re-run `script/create_xcframework` and replace the embedded copy whenever this fork's ObjectiveGit sources or vendored libgit2/libssh2/OpenSSL versions change.
+
 ## Contributing
 
-1. Fork this repository
-1. Make it awesomer (preferably in a branch named for the topic)
-1. Send a pull request
+This is a personal fork; pull requests here should target
+[starv/objective-git](https://github.com/starv/objective-git), not the
+upstream project. For changes intended for the wider libgit2/ObjectiveGit
+community, see [libgit2/objective-git](https://github.com/libgit2/objective-git)
+instead.
 
 All contributions should match GitHub's [Objective-C coding
 conventions](https://github.com/github/objective-c-style-guide).
 
-You can see all the amazing people that have contributed to this project
-[here](https://github.com/libgit2/objective-git/graphs/contributors).
+This fork is based on the work of all the amazing people who have
+contributed to the original project, [listed here](https://github.com/libgit2/objective-git/graphs/contributors).
 
 
 ## License
