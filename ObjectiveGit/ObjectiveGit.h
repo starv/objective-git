@@ -42,6 +42,7 @@ FOUNDATION_EXPORT const unsigned char ObjectiveGitVersionString[];
 #import <ObjectiveGit/GTRepository+Reset.h>
 #import <ObjectiveGit/GTRepository+Pull.h>
 #import <ObjectiveGit/GTRepository+Merging.h>
+#import <ObjectiveGit/GTRepository+Worktree.h>
 #import <ObjectiveGit/GTEnumerator.h>
 #import <ObjectiveGit/GTCommit.h>
 #import <ObjectiveGit/GTCredential.h>
@@ -64,6 +65,7 @@ FOUNDATION_EXPORT const unsigned char ObjectiveGitVersionString[];
 #import <ObjectiveGit/GTReflogEntry.h>
 #import <ObjectiveGit/GTOID.h>
 #import <ObjectiveGit/GTSubmodule.h>
+#import <ObjectiveGit/GTWorktree.h>
 #import <ObjectiveGit/GTStatusDelta.h>
 #import <ObjectiveGit/GTRepository+Blame.h>
 #import <ObjectiveGit/GTFilter.h>
