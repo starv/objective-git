@@ -13,7 +13,7 @@
 
 /// Creates an `NSString` array from a `git_strarray`.
 ///
-/// The `git_strarray` must still be freed using `git_strarray_free` after use.
+/// The `git_strarray` must still be freed using `git_strarray_dispose` after use.
 ///
 /// strarray - The `git_strarray` to convert.
 ///
@@ -26,7 +26,7 @@
 /// Must only be called with an array of `NSString`s, otherwise an assertion
 /// will fail.
 ///
-/// Returns a `git_strarray` which must be freed using `git_strarray_free` after
+/// Returns a `git_strarray` which must be freed using `git_strarray_dispose` after
 /// use.
 - (git_strarray)git_strarray;
 

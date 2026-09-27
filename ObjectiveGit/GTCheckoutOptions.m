@@ -52,6 +52,10 @@ typedef int  (^GTCheckoutNotifyBlock)(GTCheckoutNotifyFlags why, NSString *path,
 	return options;
 }
 
++ (instancetype)safeCheckoutOptions {
+	return [self checkoutOptionsWithStrategy:GTCheckoutStrategySafe];
+}
+
 - (instancetype)init {
 	self = [super init];
 	if (self == nil) return nil;

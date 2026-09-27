@@ -1,0 +1,58 @@
+#!/bin/sh
+
+set -e
+
+ROOT_PATH=$(cd "$(dirname "$0")/.." && pwd)
+EXTERNAL_BUILD_PATH="${ROOT_PATH}/External/build"
+
+if [ "${EXTERNAL_BUILD_PATH}/lib/libcrypto.a" -nt "${ROOT_PATH}/External/openssl" ]
+then
+    echo "No update needed."
+    exit 0
+fi
+
+cd "${ROOT_PATH}/External/openssl"
+
+# Only libcrypto's primitives (key parsing/signing for libssh2's SSH backend)
+# are ever linked by this project -- no libssl, no config-driven engine/module
+# loading, and no `openssl` CLI app. Harden the build accordingly:
+#   no-autoload-config  - don't auto-load an OpenSSL config file (or engines/
+#                         modules named via it or $OPENSSL_CONF) at init time.
+#   no-dso              - no dynamic shared object support (no dlopen'ing
+#                         engines/providers).
+#   no-engine           - no engine subsystem.
+#   no-module           - no dynamically loadable provider modules.
+#   no-apps             - don't build the `openssl` CLI app.
+# --openssldir is intentionally a neutral, non-developer-specific path: since
+# no-autoload-config disables config loading, this directory is never read at
+# runtime -- it's only baked into the binary as a fallback string, so it must
+# not leak the build machine's actual home directory.
+#
+# --prefix is likewise kept neutral (/usr/local) rather than pointing at
+# EXTERNAL_BUILD_PATH directly: OpenSSL bakes PREFIX-derived ENGINESDIR/
+# MODULESDIR fallback strings into libcrypto.a's crypto/cversion.o regardless
+# of no-dso/no-engine/no-module (they're unconditionally compiled informational
+# strings, unused at runtime here since dynamic loading is disabled) -- if
+# --prefix were the real absolute build path, those strings would leak the
+# developer's home directory the same way --openssldir did. Instead, install
+# with DESTDIR into a staging directory, then flatten the neutral prefix's
+# "usr/local" subtree into EXTERNAL_BUILD_PATH so libssh2/libgit2's existing
+# `${EXTERNAL_BUILD_PATH}/lib` and `${EXTERNAL_BUILD_PATH}/include` layout
+# expectations are unaffected.
+export MACOSX_DEPLOYMENT_TARGET=15.0
+
+STAGE_PATH="${EXTERNAL_BUILD_PATH}/.openssl-install-stage"
+rm -rf "${STAGE_PATH}"
+
+perl Configure darwin64-arm64-cc no-shared no-tests \
+    no-autoload-config no-dso no-engine no-module no-apps \
+    --prefix=/usr/local \
+    --openssldir=/usr/local/ssl
+make -j"$(sysctl -n hw.ncpu)"
+make install_dev DESTDIR="${STAGE_PATH}"
+
+mkdir -p "${EXTERNAL_BUILD_PATH}"
+cp -R "${STAGE_PATH}/usr/local/." "${EXTERNAL_BUILD_PATH}/"
+rm -rf "${STAGE_PATH}"
+
+echo "OpenSSL has been updated."

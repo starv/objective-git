@@ -1,0 +1,58 @@
+#!/bin/sh
+#
+# generate_objectivegit_modulemap
+#
+# Regenerates ObjectiveGit.modulemap from the libgit2 headers actually
+# vendored in External/libgit2/include/git2, so the module map can never
+# drift out of sync with the vendored libgit2 version (as happened when
+# libgit2 grew worktree.h, email.h, mailmap.h, and ~25 other headers that
+# a hand-maintained module map silently missed).
+#
+# Wired in as an early Run Script build phase on the ObjectiveGit-Mac
+# target, so ObjectiveGit.modulemap (checked into git) is always freshly
+# derived before it's embedded into the built framework. Do not hand-edit
+# ObjectiveGit.modulemap -- edit this script instead.
+
+set -e
+
+ROOT_PATH=$(cd "$(dirname "$0")/.." && pwd)
+GIT2_INCLUDE="${ROOT_PATH}/External/libgit2/include/git2"
+MODULEMAP_PATH="${ROOT_PATH}/ObjectiveGit.modulemap"
+
+if [ ! -d "$GIT2_INCLUDE" ]; then
+    echo "error: libgit2 headers not found at ${GIT2_INCLUDE} -- run script/bootstrap first" >&2
+    exit 1
+fi
+
+# Windows/MSVC-only compatibility shim (entirely #ifdef _MSC_VER); not part
+# of libgit2's real public API surface on this platform.
+EXCLUDED_HEADERS="stdint.h"
+
+{
+    echo "framework module ObjectiveGit {"
+    echo "	umbrella header \"ObjectiveGit.h\""
+    echo ""
+
+    find "$GIT2_INCLUDE" -name "*.h" | sort | while IFS= read -r header; do
+        relative="git2/${header#"$GIT2_INCLUDE"/}"
+        header_name=$(basename "$header")
+
+        excluded=0
+        for candidate in $EXCLUDED_HEADERS; do
+            if [ "$header_name" = "$candidate" ]; then
+                excluded=1
+            fi
+        done
+        [ "$excluded" -eq 1 ] && continue
+
+        echo "	header \"${relative}\""
+    done
+
+    echo ""
+    echo "	export *"
+    echo "	module * { export * }"
+    echo "}"
+} > "$MODULEMAP_PATH"
+
+header_count=$(find "$GIT2_INCLUDE" -name "*.h" | wc -l | tr -d ' ')
+echo "Regenerated ${MODULEMAP_PATH} from ${header_count} vendored libgit2 headers"

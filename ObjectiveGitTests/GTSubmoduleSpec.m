@@ -10,6 +10,9 @@
 @import Nimble;
 @import Quick;
 
+#import <stdlib.h>
+#import <sys/syslimits.h>
+
 #import "QuickSpec+GTFixtures.h"
 
 QuickSpecBegin(GTSubmoduleSpec)
@@ -101,6 +104,20 @@ it(@"should update the ignore rule", ^{
 	GTSubmodule *updatedSubmodule = [submodule submoduleByUpdatingIgnoreRule:GTSubmoduleIgnoreAll error:NULL];
 	expect(@(updatedSubmodule.ignoreRule)).to(equal(@(GTSubmoduleIgnoreAll)));
 	expect(@(submodule.ignoreRule)).to(equal(@(GTSubmoduleIgnoreNone)));
+});
+
+it(@"either updates the ignore rule or fails loudly, but never no-ops silently", ^{
+	GTSubmodule *submodule = [repo submoduleWithName:@"Test_App" error:NULL];
+	expect(submodule).notTo(beNil());
+
+	NSError *error = nil;
+	GTSubmodule *updated = [submodule submoduleByUpdatingIgnoreRule:GTSubmoduleIgnoreAll error:&error];
+
+	if (updated == nil) {
+		expect(error).notTo(beNil());
+	} else {
+		expect(@(updated.ignoreRule)).to(equal(@(GTSubmoduleIgnoreAll)));
+	}
 });
 
 describe(@"clean, checked out submodule", ^{
@@ -246,7 +263,32 @@ describe(@"dirty, checked out submodule", ^{
 
 		__block NSError *error = nil;
 		expect(@([submodule sync:&error])).to(beTruthy());
-		expect([config stringForKey:configKey]).to(equal(@"../Test_App"));
+
+		// Upstream libgit2 commit 42e0bed26 ("Fix git_submodule_sync with
+		// relative url", landed between the 0.28 series this project used to
+		// vendor and the current 1.9.7) changed git_submodule_sync to resolve
+		// the .gitmodules URL relative to the parent repository (via
+		// git_submodule__resolve_url, see
+		// External/libgit2/src/libgit2/submodule.c) before writing it to
+		// .git/config, instead of writing the raw relative string verbatim.
+		// This repo has no configured remote, so the resolution base is the
+		// repository's own working directory: "../Test_App" now resolves to
+		// the absolute path of the sibling "Test_App" fixture checkout,
+		// rather than being written back unresolved as it was pre-1.0.
+		//
+		// NSString/NSURL's `stringByResolvingSymlinksInPath` deliberately does
+		// *not* resolve macOS's /tmp, /var, /etc compatibility symlinks (e.g.
+		// /var -> /private/var) -- only the real, C-level realpath(3) does,
+		// which is what libgit2 uses internally. Fixture paths live under
+		// NSTemporaryDirectory(), i.e. under /var, so realpath(3) is used here
+		// to match libgit2's resolved path exactly.
+		char resolvedPathBuffer[PATH_MAX];
+		NSString *repositoryPath = repo.fileURL.path;
+		char *realpathResult = realpath(repositoryPath.fileSystemRepresentation, resolvedPathBuffer);
+		expect([NSValue valueWithPointer:realpathResult]).notTo(equal([NSValue valueWithPointer:NULL]));
+		NSString *resolvedRepositoryPath = [NSFileManager.defaultManager stringWithFileSystemRepresentation:resolvedPathBuffer length:strlen(resolvedPathBuffer)];
+		NSString *expectedResolvedURL = [[resolvedRepositoryPath stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"Test_App"];
+		expect([config stringForKey:configKey]).to(equal(expectedResolvedURL));
 	});
 });
 

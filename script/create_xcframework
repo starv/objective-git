@@ -1,0 +1,64 @@
+#!/bin/sh
+
+set -e
+
+ROOT_PATH=$(cd "$(dirname "$0")/.." && pwd)
+BUILD_PATH="${ROOT_PATH}/build"
+ARCHIVE_PATH="${BUILD_PATH}/ObjectiveGit-macOS.xcarchive"
+XCFRAMEWORK_PATH="${BUILD_PATH}/ObjectiveGit.xcframework"
+
+rm -rf "${ARCHIVE_PATH}" "${XCFRAMEWORK_PATH}"
+
+xcodebuild archive \
+    -project "${ROOT_PATH}/ObjectiveGitFramework.xcodeproj" \
+    -scheme "ObjectiveGit Mac" \
+    -archivePath "${ARCHIVE_PATH}" \
+    -destination "generic/platform=macOS" \
+    SKIP_INSTALL=NO \
+    BUILD_LIBRARY_FOR_DISTRIBUTION=YES
+
+# Locate the framework within the archive's Products directory (path varies by Xcode version)
+FRAMEWORK_PATH=$(find "${ARCHIVE_PATH}/Products" -name "ObjectiveGit.framework" -type d)
+
+if [ -z "$FRAMEWORK_PATH" ]; then
+    echo "ERROR: Could not find ObjectiveGit.framework in archive at ${ARCHIVE_PATH}/Products"
+    exit 1
+fi
+
+# Ensure exactly one framework was found
+FRAMEWORK_COUNT=$(echo "$FRAMEWORK_PATH" | wc -l | tr -d ' ')
+if [ "$FRAMEWORK_COUNT" -ne 1 ]; then
+    echo "ERROR: Found multiple ObjectiveGit.framework paths in archive:"
+    echo "$FRAMEWORK_PATH"
+    exit 1
+fi
+
+# Stamp the vendored libgit2 version and ObjectiveGit commit into the
+# framework's Info.plist so a built framework can be traced back to the
+# sources it was built from.
+LIBGIT2_VERSION=$(sed -n 's/^#define LIBGIT2_VERSION *"\(.*\)"/\1/p' "${ROOT_PATH}/External/libgit2/include/git2/version.h")
+OBJECTIVEGIT_REVISION=$(git -C "${ROOT_PATH}" rev-parse --short HEAD)
+INFO_PLIST="${FRAMEWORK_PATH}/Versions/A/Resources/Info.plist"
+
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${LIBGIT2_VERSION}" "${INFO_PLIST}" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string ${LIBGIT2_VERSION}" "${INFO_PLIST}"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${OBJECTIVEGIT_REVISION}" "${INFO_PLIST}" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string ${OBJECTIVEGIT_REVISION}" "${INFO_PLIST}"
+
+xcodebuild -create-xcframework \
+    -framework "$FRAMEWORK_PATH" \
+    -output "${XCFRAMEWORK_PATH}"
+
+# Editing the Info.plist above invalidates the framework's original signature
+# anyway, so give each platform slice a real ad-hoc signature here --
+# without this, `codesign --verify --strict` rejects it ("code has no
+# resources but signature indicates they must be present"). Signing the
+# xcframework wrapper itself with --deep does *not* reach into the nested
+# platform-slice frameworks, so each one has to be signed directly. Xcode
+# re-signs everything again on embed, so this only needs to be valid enough
+# to pass verification for anyone inspecting or transporting the xcframework
+# directly.
+find "${XCFRAMEWORK_PATH}" -maxdepth 2 -name "*.framework" -type d -print0 \
+    | xargs -0 -I{} codesign --force --sign - "{}"
+
+echo "Created ${XCFRAMEWORK_PATH} (libgit2 ${LIBGIT2_VERSION}, ObjectiveGit ${OBJECTIVEGIT_REVISION})"

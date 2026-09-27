@@ -1,0 +1,40 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# fix_libgit2_header_includes
+#
+# libgit2's public headers quote-include sibling headers as "git2/foo.h",
+# which only resolves when the including compiler has an -I search path
+# rooted one level above the git2/ folder (true for a normal library build,
+# via External/libgit2/include). Framework-style module builds don't fall
+# back to search paths for quoted includes -- only the including file's own
+# directory is checked -- so once these headers are copied verbatim into
+# ObjectiveGit.framework/Headers/git2/, those includes fail to resolve for
+# framework consumers (this is what broke `git2/cred_helpers.h`, which
+# quote-includes "git2/credential_helpers.h").
+#
+# Rather than special-casing individual files, this rewrites every
+# "git2/..."-prefixed quoted include found in the copied headers to the
+# correct path relative to the including file, computed from the actual
+# copied layout. Run as a build phase immediately after "Copy git2 Headers"
+# copies libgit2's headers into the built framework.
+
+require 'pathname'
+
+headers_root = Pathname.new(ENV.fetch('TARGET_BUILD_DIR')) + ENV.fetch('PUBLIC_HEADERS_FOLDER_PATH')
+git2_root = headers_root + 'git2'
+
+abort "error: #{git2_root} not found -- did the \"Copy git2 Headers\" phase run?" unless git2_root.directory?
+
+Dir.glob(git2_root + '**' + '*.h').each do |path|
+  file = Pathname.new(path)
+  contents = File.read(file)
+
+  rewritten = contents.gsub(/#\s*include\s+"git2\/([^"]+)"/) do
+    target = git2_root + Regexp.last_match(1)
+    relative = target.relative_path_from(file.dirname)
+    "#include \"#{relative}\""
+  end
+
+  File.write(file, rewritten) if rewritten != contents
+end

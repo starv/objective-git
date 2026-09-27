@@ -16,7 +16,16 @@ NS_ASSUME_NONNULL_BEGIN
 /// Checkout strategies used by the various -checkout... methods
 /// See git_checkout_strategy_t
 typedef NS_OPTIONS(NSInteger, GTCheckoutStrategyType) {
+	/// Since libgit2 1.9, this is a real (non-zero) flag meaning "do not
+	/// perform a checkout and do not fire callbacks" -- it is no longer the
+	/// 0/default value. Omit all strategy flags (or use `+safeCheckoutOptions`)
+	/// to get the actual default, safe checkout behavior.
 	GTCheckoutStrategyNone = GIT_CHECKOUT_NONE,
+	/// Since libgit2 1.9, this is the 0 value (the default, safe behavior
+	/// achieved by not setting any other strategy flag), so Swift cannot
+	/// reference it as an option set member (it imports as unavailable --
+	/// "use [] to construct an empty option set"). From Swift, use `[]` or
+	/// `GTCheckoutOptions.safe()` instead of `.safe`.
 	GTCheckoutStrategySafe = GIT_CHECKOUT_SAFE,
 	GTCheckoutStrategyForce = GIT_CHECKOUT_FORCE,
 	GTCheckoutStrategyRecreateMissing = GIT_CHECKOUT_RECREATE_MISSING,
@@ -36,6 +45,7 @@ typedef NS_OPTIONS(NSInteger, GTCheckoutStrategyType) {
 	GTCheckoutStrategyCoflictStyleDiff3 = GIT_CHECKOUT_CONFLICT_STYLE_DIFF3,
 	GTCheckoutStrategyDoNotRemoveExisting = GIT_CHECKOUT_DONT_REMOVE_EXISTING,
 	GTCheckoutStrategyDoNotWriteIndex = GIT_CHECKOUT_DONT_WRITE_INDEX,
+	GTCheckoutStrategyDryRun = GIT_CHECKOUT_DRY_RUN,
 };
 
 /// Checkout notification flags used by the various -checkout... methods
@@ -77,6 +87,15 @@ typedef NS_OPTIONS(NSInteger, GTCheckoutNotifyFlags) {
 /// Create a checkout options object.
 /// @see +checkoutOptionsWithStrategy:notifyFlags:progressBlock:notifyBlock:
 + (instancetype)checkoutOptionsWithStrategy:(GTCheckoutStrategyType)strategy;
+
+/// Create a checkout options object using the default, safe checkout
+/// strategy (`GTCheckoutStrategySafe`, value 0).
+///
+/// Swift cannot reference `GTCheckoutStrategySafe` directly (a zero-valued
+/// option set member imports as unavailable), so this is the Swift-friendly
+/// way to get the same behavior as `+checkoutOptionsWithStrategy:` called
+/// with no flags.
++ (instancetype)safeCheckoutOptions NS_SWIFT_NAME(safe());
 
 /// Get the underlying git_checkout_options struct.
 ///

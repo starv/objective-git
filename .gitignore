@@ -16,3 +16,8 @@
 External/libgit2-mac.a
 Carthage/Build
 
+/External/build/
+/build/
+
+.worktrees/
+

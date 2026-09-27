@@ -164,6 +164,25 @@ describe(@"application", ^{
 
 		expect([NSData dataWithContentsOfURL:testFileURL]).to(equal(replacementData));
 	});
+
+	it(@"round-trips binary data containing embedded NUL bytes without truncation", ^{
+		setUpFilterWithApplyBlock(^ NSData * (void **payload, NSData *from, GTFilterSource *source, BOOL *applied) {
+			return from;
+		});
+
+		NSError *error = nil;
+		GTFilterList *filterList = [repository filterListWithPath:testFile blob:nil mode:GTFilterSourceModeClean options:GTFilterListOptionsDefault success:NULL error:&error];
+		expect(filterList).notTo(beNil());
+		expect(error).to(beNil());
+
+		uint8_t rawBytes[] = { 0x00, 0xFF, 0x00, 0x41, 0x00, 0x42 };
+		NSData *original = [NSData dataWithBytes:rawBytes length:sizeof(rawBytes)];
+
+		NSData *roundTripped = [filterList applyToData:original error:&error];
+
+		expect(error).to(beNil());
+		expect(roundTripped).to(equal(original));
+	});
 });
 
 it(@"should include the right filter source", ^{

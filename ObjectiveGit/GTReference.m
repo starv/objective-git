@@ -236,7 +236,9 @@ static NSString *referenceTypeToString(GTReferenceType type) {
 }
 
 + (BOOL)isValidReferenceName:(NSString *)refName {
-	return git_reference_is_valid_name(refName.UTF8String) == 1;
+	int valid = 0;
+	int gitError = git_reference_name_is_valid(&valid, refName.UTF8String);
+	return gitError == GIT_OK && valid == 1;
 }
 
 #pragma mark NSObject

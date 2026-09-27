@@ -12,7 +12,10 @@
 #import "GTFilterSource.h"
 
 #import "git2/errors.h"
+#import "git2/sys/errors.h"
 #import "git2/sys/filter.h"
+
+#import <string.h>
 
 NSString * const GTFilterErrorDomain = @"GTFilterErrorDomain";
 
@@ -109,7 +112,44 @@ static int GTFilterApply(git_filter *filter, void **payload, git_buf *to, const 
 	NSData *toData = self.applyBlock(payload, fromData, [[GTFilterSource alloc] initWithGitFilterSource:src], &applied);
 	if (!applied) return GIT_PASSTHROUGH;
 
-	git_buf_set(to, toData.bytes, toData.length);
+	// `git_buf` is output-only in libgit2 1.x, and `git_buf_set` no longer
+	// exists in the public API. Populate `to` directly with an allocation
+	// that `git_buf_dispose` (which frees `ptr` with the default allocator)
+	// can safely release, and NUL-terminate per the documented `git_buf`
+	// contract even though the content may itself contain embedded NULs.
+	//
+	// `to` is not guaranteed to arrive empty: in libgit2 1.9's legacy
+	// `git_filter_apply_fn` path, the buffer backing `to` is reused scratch
+	// storage (e.g. a filter session's temp buffer, see
+	// src/libgit2/filter.c) that's cleared but *not freed* between filter
+	// invocations, so `to->ptr`/`to->reserved` can already point at a live
+	// allocation here. Reuse/grow that allocation with `realloc` instead of
+	// leaking it, mirroring what `git_buf_set` used to do.
+	//
+	// Critically, `to->reserved == 0` does NOT imply `to->ptr == NULL`:
+	// libgit2's `git_str_clear` (src/util/str.c) resets an unallocated
+	// buffer's `ptr` to its static empty-string sentinel (`git_str__initstr`)
+	// rather than NULL, while leaving `reserved` at 0. That sentinel is a
+	// non-NULL pointer that was never heap-allocated, so passing it to
+	// `realloc` is undefined behavior (observed to abort on macOS). Only
+	// `to->reserved > 0` guarantees `to->ptr` is a real heap allocation safe
+	// to hand to `realloc`; otherwise pass NULL, which `realloc` treats as a
+	// fresh `malloc`.
+	size_t length = toData.length;
+	char *existingBuffer = (to->reserved > 0) ? to->ptr : NULL;
+	char *buffer = realloc(existingBuffer, length + 1);
+	if (buffer == NULL) {
+		git_error_set_oom();
+		return GIT_ERROR;
+	}
+
+	memcpy(buffer, toData.bytes, length);
+	buffer[length] = '\0';
+
+	to->ptr = buffer;
+	to->size = length;
+	to->reserved = length + 1;
+
 	return 0;
 }
 

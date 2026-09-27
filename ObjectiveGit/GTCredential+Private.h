@@ -15,7 +15,9 @@
 //
 // Example: ```
 //   struct GTCredentialAcquireCallbackInfo info = { .credProvider = myProvider }
-//   git_remote_set_cred_acquire_cb(&git_remote, GTCredentialAcquireCallback, &payload);
+//   git_fetch_options options = GIT_FETCH_OPTIONS_INIT;
+//   options.callbacks.credentials = GTCredentialAcquireCallback;
+//   options.callbacks.payload = &info;
 // ```
 //
 // `GTCredentialAcquireCallback` will act as a trampoline, and will ask the
@@ -27,4 +29,4 @@ typedef struct {
 	__unsafe_unretained GTCredentialProvider *credProvider;
 } GTCredentialAcquireCallbackInfo;
 
-int GTCredentialAcquireCallback(git_cred **cred, const char *url, const char *username_from_url, unsigned int allowed_types, void *payload);
+int GTCredentialAcquireCallback(git_credential **cred, const char *url, const char *username_from_url, unsigned int allowed_types, void *payload);

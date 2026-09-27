@@ -10,7 +10,7 @@ config ()
 {
     # A whitespace-separated list of executables that must be present and locatable.
     # These will each be installed through Homebrew if not found.
-    : ${REQUIRED_TOOLS="cmake libssh2 libtool autoconf automake pkg-config"}
+    : ${REQUIRED_TOOLS="cmake libtool autoconf automake pkg-config"}
 
     export REQUIRED_TOOLS
 }
@@ -37,6 +37,18 @@ main ()
         update_submodules
     fi
 
+    if [ -d "Carthage/Checkouts/Quick" ]
+    then
+        echo "*** Patching Carthage-vendored Quick/Nimble/ZipArchive for the current Xcode toolchain..."
+        patch_carthage_dependencies
+        local patch_result=$?
+
+        if [ "$patch_result" -ne "0" ]
+        then
+            exit $patch_result
+        fi
+    fi
+
     if [ -n "$REQUIRED_TOOLS" ]
     then
         echo "*** Checking dependencies..."
@@ -53,15 +65,13 @@ check_deps ()
     if [ "$result" -ne "0" ]
     then
         echo
-        echo "Homebrew is not installed (http://brew.sh). You will need to manually ensure the following tools are installed:"
+        echo "Homebrew is not installed (https://brew.sh). Please install it, or manually ensure the following tools are installed:"
         echo "  $REQUIRED_TOOLS"
         echo
-        echo "Additionally, the following libssh2 files must be symlinked under /usr/local:"
-        echo "  lib/libssh2.a include/libssh2.h include/libssh2_sftp.h include/libssh2_publickey.h"
         exit $result
     fi
 
-    # Ensure that we have libgit2's dependencies installed.
+    # Ensure that we have libgit2/libssh2's build-time dependencies installed.
     installed=`brew list --formula`
 
     for tool in $REQUIRED_TOOLS
@@ -81,28 +91,6 @@ check_deps ()
         echo "*** Installing $tool with Homebrew..."
         brew install "$tool"
     done
-
-    brew_prefix=`brew --prefix`
-    expected_prefix=/usr/local
-
-    if [ "$brew_prefix" != "$expected_prefix" ]
-    then
-        echo "*** Adding soft links into $expected_prefix..."
-
-        products=(lib/libssh2.a include/libssh2.h include/libssh2_sftp.h include/libssh2_publickey.h)
-
-        for product in "${products[@]}"
-        do
-            destination="$expected_prefix/$product"
-            if [ -e "$destination" ]
-            then
-                continue
-            fi
-
-            sudo mkdir -p "$(dirname "$destination")"
-            sudo ln -s "$brew_prefix/$product" "$destination"
-        done
-    fi
 }
 
 bootstrap_submodule ()
@@ -125,7 +113,19 @@ update_submodules ()
         git submodule foreach --quiet bootstrap_submodule
 }
 
+# Old Carthage-vendored dependencies (Quick/Nimble/ZipArchive) ship Xcode
+# projects with deployment targets and warning settings a modern Xcode
+# toolchain rejects outright. `git submodule update` re-checks-out these
+# projects verbatim on every clone/sync, silently discarding any one-off
+# local edit -- so patch them here, every bootstrap, instead. Idempotent:
+# see script/patch_carthage_dependencies.rb.
+patch_carthage_dependencies ()
+{
+    ruby "$SCRIPT_DIR/patch_carthage_dependencies.rb"
+}
+
 export -f bootstrap_submodule
 export -f update_submodules
+export -f patch_carthage_dependencies
 
 main

@@ -15,13 +15,13 @@ if command -v brew >/dev/null 2>&1; then
     PATH="$(brew --prefix)/bin:$PATH"
 fi
 
-if [ "External/libgit2-mac.a" -nt "External/libgit2" ]
+if [ "${EXTERNAL_BUILD_PATH}/lib/libssh2.a" -nt "${ROOT_PATH}/External/libssh2" ]
 then
     echo "No update needed."
     exit 0
 fi
 
-cd "External/libgit2"
+cd "${ROOT_PATH}/External/libssh2"
 
 if [ -d "build" ]; then
     rm -rf "build"
@@ -31,20 +31,17 @@ mkdir build
 cd build
 
 cmake -DBUILD_SHARED_LIBS:BOOL=OFF \
-    -DBUILD_TESTS:BOOL=OFF \
-    -DBUILD_CLI:BOOL=OFF \
-    -DUSE_SSH=libssh2 \
-    -DUSE_HTTPS=SecureTransport \
+    -DBUILD_STATIC_LIBS:BOOL=ON \
+    -DBUILD_EXAMPLES:BOOL=OFF \
+    -DBUILD_TESTING:BOOL=OFF \
+    -DCRYPTO_BACKEND=OpenSSL \
+    -DOPENSSL_ROOT_DIR="${EXTERNAL_BUILD_PATH}" \
+    -DOPENSSL_USE_STATIC_LIBS=TRUE \
     -DCMAKE_PREFIX_PATH="${EXTERNAL_BUILD_PATH}" \
+    -DCMAKE_INSTALL_PREFIX="${EXTERNAL_BUILD_PATH}" \
     -DCMAKE_OSX_ARCHITECTURES=arm64 \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
     ..
-cmake --build .
+cmake --build . --target install
 
-product="libgit2.a"
-install_path="../../"
-if [ "libgit2.a" -nt "${install_path}/libgit2-mac.a" ]; then
-    cp -v "libgit2.a" "${install_path}/libgit2-mac.a"
-fi
-
-echo "libgit2 has been updated."
+echo "libssh2 has been updated."

@@ -214,9 +214,9 @@ typedef struct {
 }
 
 
-typedef void(^GTTransferProgressBlock)(const git_transfer_progress *progress, BOOL *stop);
+typedef void(^GTTransferProgressBlock)(const git_indexer_progress *progress, BOOL *stop);
 
-static int transferProgressCallback(const git_transfer_progress *progress, void *payload) {
+static int transferProgressCallback(const git_indexer_progress *progress, void *payload) {
 	if (payload == NULL) return 0;
 	struct GTClonePayload *pld = payload;
 	if (pld->transferProgressBlock == NULL) return 0;
@@ -244,7 +244,7 @@ struct GTRemoteCreatePayload {
 	git_remote_callbacks remoteCallbacks;
 };
 
-+ (instancetype _Nullable)cloneFromURL:(NSURL *)originURL toWorkingDirectory:(NSURL *)workdirURL options:(NSDictionary * _Nullable)options error:(NSError **)error transferProgressBlock:(void (^ _Nullable)(const git_transfer_progress *, BOOL *stop))transferProgressBlock {
++ (instancetype _Nullable)cloneFromURL:(NSURL *)originURL toWorkingDirectory:(NSURL *)workdirURL options:(NSDictionary * _Nullable)options error:(NSError **)error transferProgressBlock:(void (^ _Nullable)(const git_indexer_progress *, BOOL *stop))transferProgressBlock {
 
 	git_clone_options cloneOptions = GIT_CLONE_OPTIONS_INIT;
 
@@ -320,7 +320,7 @@ struct GTRemoteCreatePayload {
 	int gitError = git_object_lookup(&obj, self.git_repository, oid, (git_object_t)type);
 	if (gitError < GIT_OK) {
 		if (error != NULL) {
-			char oid_str[GIT_OID_HEXSZ+1];
+			char oid_str[GIT_OID_SHA1_HEXSIZE+1];
 			git_oid_tostr(oid_str, sizeof(oid_str), oid);
 			*error = [NSError git_errorFor:gitError description:@"Failed to lookup object" userInfo:@{GTGitErrorOID: [GTOID oidWithGitOid:oid]} failureReason:@"The object %s couldn't be found in the repository.", oid_str];
 		}
@@ -501,7 +501,7 @@ typedef void (^GTRepositoryBranchEnumerationBlock)(GTBranch *branch, BOOL *stop)
 
 	NSArray *remoteNames = [NSArray git_arrayWithStrarray:array];
 
-	git_strarray_free(&array);
+	git_strarray_dispose(&array);
 
 	return remoteNames;
 }
@@ -631,7 +631,7 @@ static int GTRepositoryForeachTagCallback(const char *name, git_oid *oid, void *
 
 	NSArray *referenceNames = [NSArray git_arrayWithStrarray:array];
 
-	git_strarray_free(&array);
+	git_strarray_dispose(&array);
 
 	return referenceNames;
 }

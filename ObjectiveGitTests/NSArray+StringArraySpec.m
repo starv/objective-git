@@ -36,7 +36,7 @@ describe(@"String arrays", ^{
 		});
 
 		afterEach(^{
-			git_strarray_free(&strArray);
+			git_strarray_dispose(&strArray);
 		});
 
 		it(@"should return null for an empty array", ^{
@@ -53,7 +53,7 @@ describe(@"String arrays", ^{
 			git_strarray copiedArray;
 			git_strarray_copy(&copiedArray, &strArray);
 			validateStrArray(originalArray, copiedArray);
-			git_strarray_free(&copiedArray);
+			git_strarray_dispose(&copiedArray);
 		});
 
 		it(@"should stay valid outside of an autorelease pool", ^{

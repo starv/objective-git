@@ -1,9 +1,6 @@
 [submodule "libgit2"]
 	path = External/libgit2
 	url = https://github.com/libgit2/libgit2.git
-[submodule "openssl"]
-	path = External/openssl
-	url = https://github.com/openssl/openssl.git
 [submodule "libssh2"]
 	path = External/libssh2
 	url = https://github.com/libssh2/libssh2.git
@@ -19,3 +16,6 @@
 [submodule "Carthage/Checkouts/ZipArchive"]
 	path = Carthage/Checkouts/ZipArchive
 	url = https://github.com/ZipArchive/ZipArchive.git
+[submodule "External/openssl"]
+	path = External/openssl
+	url = https://github.com/openssl/openssl.git
